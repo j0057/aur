@@ -1,0 +1,6 @@
+PKGS=(
+    "pkg1"
+    "pkg2"
+)
+export PKGDEST="/path/to/repo"
+
