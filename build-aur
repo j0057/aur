@@ -2,6 +2,10 @@
 
 . build-aur.conf
 
+ARCH=$(uname -m)
+
+export PKGDEST=${REPO}
+
 mkdir -p "${PKGDEST}"
 mkdir -p build
 
@@ -21,7 +25,7 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
         cd "${name}"
         makepkg --force --syncdeps --rmdeps
         cd ..
-        repo-add --new "${PKGDEST}/aur.db.tar.gz" ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
+        repo-add --new "${REPO}/aur.db.tar.gz" ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
         sudo pacman -Sy
     else
         echo "==> Skipping ${name}-${pkgver}-${pkgrel}"
