@@ -16,6 +16,8 @@ if [ ! -f "${REPO}/${NAME}.db.tar.gz" ]; then
     ln -s "${NAME}.db.tar.gz" "${REPO}/${NAME}.db"
 fi
 
+[ "$(id -u)" -eq 0 ] && ASROOT="--asroot" || ASROOT=""
+
 cd build
 for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     name="${PKGS[i]}"
@@ -24,18 +26,21 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     echo "==> ${name} @ ${url}"
     curl --silent "${url}" > "${name}.tar.gz"
     tar xzf "${name}.tar.gz"
+    rm "${name}.tar.gz"
 
     pkgver=$(sed -n '/^pkgver=/ s/pkgver=// p' "${name}/PKGBUILD")
     pkgrel=$(sed -n '/^pkgrel=/ s/pkgrel=// p' "${name}/PKGBUILD")
 
     if [ ! -f ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz ]; then
         cd "${name}"
-        makepkg --force --syncdeps --rmdeps --asroot --noconfirm --ignorearch
+        makepkg --force --syncdeps --rmdeps --noconfirm --ignorearch ${ASROOT}
         cd ..
         repo-add --new "${REPO}/$NAME.db.tar.gz" ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
         sudo pacman -Sy
     else
-        echo "==> Skipping ${name}-${pkgver}-${pkgrel}"
+        echo "==> skipping ${name}-${pkgver}-${pkgrel}"
     fi
+
+    rm -rf "${name}"
 done
 cd ..
