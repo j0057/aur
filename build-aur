@@ -3,11 +3,18 @@
 . build-aur.conf
 
 ARCH=$(uname -m)
+NAME=$(basename $REPO)
 
 export PKGDEST=${REPO}
 
 mkdir -p "${PKGDEST}"
 mkdir -p build
+
+if [ ! -f "${REPO}/${NAME}.db.tar.gz" ]; then
+    echo "==> initializing empty repository"
+    tar cvfT "${REPO}/${NAME}.db.tar.gz" /dev/null
+    ln -s "${NAME}.db.tar.gz" "${REPO}/${NAME}.db"
+fi
 
 cd build
 for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
@@ -23,9 +30,9 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
 
     if [ ! -f ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz ]; then
         cd "${name}"
-        makepkg --force --syncdeps --rmdeps
+        makepkg --force --syncdeps --rmdeps --asroot --noconfirm --ignorearch
         cd ..
-        repo-add --new "${REPO}/aur.db.tar.gz" ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
+        repo-add --new "${REPO}/$NAME.db.tar.gz" ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
         sudo pacman -Sy
     else
         echo "==> Skipping ${name}-${pkgver}-${pkgrel}"
