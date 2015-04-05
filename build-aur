@@ -2,45 +2,62 @@
 
 . build-aur.conf
 
+message() { echo -e "\e[1;32m==>\e[1;33m $1\e[0;0m" ; }
+
 ARCH=$(uname -m)
 NAME=$(basename $REPO)
 
-export PKGDEST=${REPO}
+mkdir -p "${REPO}"
+mkdir -p /tmp/build-$$
 
-mkdir -p "${PKGDEST}"
-mkdir -p build
+message "Giving user nobody privilege to run pacman"
+echo 'nobody ALL=(ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/nobody-pacman-$$
 
 if [ ! -f "${REPO}/${NAME}.db.tar.gz" ]; then
-    echo "==> initializing empty repository"
+    message "Initializing empty repository in ${REPO}"
     tar cvfT "${REPO}/${NAME}.db.tar.gz" /dev/null
     ln -s "${NAME}.db.tar.gz" "${REPO}/${NAME}.db"
+    pacman --sync --refresh
+    pacman --sync --clean --noconfirm
 fi
 
-[ "$(id -u)" -eq 0 ] && ASROOT="--asroot" || ASROOT=""
-
-cd build
+cd /tmp/build-$$
 for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     name="${PKGS[i]}"
     prefix="${name:0:2}"
     url="https://aur.archlinux.org/packages/${prefix}/${name}/${name}.tar.gz"
-    echo "==> ${name} @ ${url}"
+
+    message "Downloading pkgbuild for ${name}"
+    message "URL: ${url}"
+
     curl --silent "${url}" > "${name}.tar.gz"
     tar xzf "${name}.tar.gz"
     rm "${name}.tar.gz"
+    chown nobody.nobody ${name}
 
     pkgver=$(sed -n '/^pkgver=/ s/pkgver=// p' "${name}/PKGBUILD")
     pkgrel=$(sed -n '/^pkgrel=/ s/pkgrel=// p' "${name}/PKGBUILD")
 
-    if [ ! -f ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz ]; then
+    if [ ! -f ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz ]; then
+        message "Building ${name}-${pkgver}-${pkgrel}"
         cd "${name}"
-        makepkg --force --syncdeps --rmdeps --noconfirm --ignorearch ${ASROOT}
+        sudo -u nobody makepkg --force --syncdeps --rmdeps --noconfirm --ignorearch
+        mv ${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz "${REPO}"
         cd ..
-        repo-add --new "${REPO}/$NAME.db.tar.gz" ${PKGDEST}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
-        sudo pacman -Sy
+        repo-add --new "${REPO}/${NAME}.db.tar.gz" ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
+        pacman --sync --refresh
     else
-        echo "==> skipping ${name}-${pkgver}-${pkgrel}"
+        message "Skipping ${name}-${pkgver}-${pkgrel}"
     fi
 
-    rm -rf "${name}"
+    message "Deleting downloaded pkgbuild file"
+    rm -rfv "${name}"
+
+    echo
 done
-cd ..
+
+message "Removing pacman privilege from user nobody"
+rm -v /etc/sudoers.d/nobody-pacman-$$
+
+message "Removing build directory /tmp/build-$$"
+rm -rfv /tmp/build-$$

@@ -1,6 +1,2 @@
-PKGS=(
-    "pkg1"
-    "pkg2"
-)
-REPO="/path/to/repo"
-
+PKGS=(pkg1 pkg2)
+REPO=/path/to/repo
