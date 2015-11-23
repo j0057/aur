@@ -2,8 +2,10 @@
 
 set -e
 
-message() { echo -e "\e[1;32m==>\e[1;33m $1\e[0;0m" ; }
-:() { sudo -u ${BUILD_USER} $* ; }
+function message_green  { echo -e "\e[1;36m==>\e[1;32m $1\e[0;0m" ; }
+function message_red    { echo -e "\e[1;36m==>\e[1;31m $1\e[0;0m" ; }
+function message_yellow { echo -e "\e[1;36m==>\e[1;33m $1\e[0;0m" ; }
+function : { sudo -u ${BUILD_USER} $* ; }
 
 . ${BUILD_AUR_CONF:-/etc/build-aur.conf}
 
@@ -12,28 +14,27 @@ BUILD_USER=${BUILD_USER:-aur}
 ARCH=$(uname -m)
 NAME=$(basename $REPO)
 
-message "${BUILD_USER}: give sudoers permission for pacman"
 cat >/etc/sudoers.d/build-aur-$$ <<EOF
 ${BUILD_USER} ALL=(ALL) NOPASSWD: /usr/bin/pacman
 EOF
-trap "rm -v /etc/sudoers.d/build-aur-$$" EXIT
+trap "rm /etc/sudoers.d/build-aur-$$" EXIT
 
 if [ ! -d "${BUILD}" ]; then
-    message "${BUILD}: creating"
+    message_red "[create] ${BUILD}"
     mkdir -pv "${BUILD}"
     chown "${BUILD_USER}" "${BUILD}"
     chmod 755 "${BUILD}"
 fi
 
 if [ ! -d "${REPO}" ]; then
-    message "${REPO}: creating"
+    message_red "[create] ${REPO}"
     mkdir -pv "${REPO}"
     chown "${BUILD_USER}" "${REPO}"
     chmod 755 "${REPO}"
 fi
 
 if [ ! -f "${REPO}/${NAME}.db.tar.gz" ]; then
-    message "${REPO}: initializing"
+    message_red "[init] ${REPO}"
     : tar cvfT "${REPO}/${NAME}.db.tar.gz" /dev/null
     : ln -s "${NAME}.db.tar.gz" "${REPO}/${NAME}.db"
     pacman --sync --refresh
@@ -49,12 +50,11 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     # XXX: wtf is this shit?!
 
     if [ ! -d "${name}" ]; then
-        message "${name}: cloning ${url}"
+        message_yellow "[clone] ${name} from ${url}"
         : git clone --origin aur ${url} ${name}
     fi
     cd "${name}"
 
-    message "${name}: pulling from ${url}"
     : git pull --rebase --verbose
 
     pkgver=$(sed -n '/^pkgver=/ s/pkgver=// p' "PKGBUILD")
@@ -64,9 +64,9 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     [ -n "${pkgrel}" ]
 
     if [ -f ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz ]; then
-        message "${name}-${pkgver}-${pkgrel}: skipping"
+        message_green "[skip] ${name}-${pkgver}-${pkgrel}"
     else
-        message "${name}-${pkgver}-${pkgrel}: building"
+        message_yellow "[build] ${name}-${pkgver}-${pkgrel}"
         : makepkg --force --syncdeps --rmdeps --noconfirm --ignorearch
         : mv ${name}-${pkgver}-${pkgrel}*.pkg.tar.xz "${REPO}"
         : repo-add --new "${REPO}/${NAME}.db.tar.gz" ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
