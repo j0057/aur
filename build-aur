@@ -11,6 +11,8 @@ function pkgbase {
         | cat \
         | sed -n '/"PackageBase"/ { s/.*: "\(.*\)".*/\1/ ; p }'
 }
+function git-ahead { git rev-list aur/master..master --count ; }
+function git-behind { git rev-list master..aur/master --count ; }
 function : { sudo -u ${BUILD_USER} $* ; }
 
 . ${BUILD_AUR_CONF:-/etc/build-aur.conf}
@@ -59,7 +61,28 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     fi
     cd "${name}"
 
-    : git pull --rebase --verbose
+    : git fetch aur
+    ahead=$(git-ahead)
+    behind=$(git-behind)
+    [ $behind -eq 0 ] \
+        && message_green "[-${behind}/+${ahead}] ${name}" \
+        || message_red   "[-${behind}/+${ahead}] ${name}"
+
+    if [ $behind -gt 0 ]; then
+        unclean+=("$name")
+    fi
+    cd ..
+done
+
+if [ ${#unclean[*]} -gt 0 ]; then
+    message_red "[error] outdated repos: ${unclean[*]}"
+    exit 2
+fi
+
+for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
+    name="${PKGS[i]}"
+
+    cd "${name}"
 
     pkgver=$(sed -n '/^pkgver=/ s/pkgver=// p' "PKGBUILD")
     pkgrel=$(sed -n '/^pkgrel=/ s/pkgrel=// p' "PKGBUILD")
