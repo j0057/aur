@@ -1,27 +1,41 @@
-#!/bin/bash -e
+#!/bin/bash
+
+set -ex
 
 message() { echo -e "\e[1;32m==>\e[1;33m $1\e[0;0m" ; }
+:() { sudo -u ${BUILD_USER} $* ; }
 
 . ${BUILD_AUR_CONF:-/etc/build-aur.conf}
 
-BUILD_USER=${BUILD_USER:-nobody}
+BUILD_USER=${BUILD_USER:-aur}
 
 ARCH=$(uname -m)
 NAME=$(basename $REPO)
 
-mkdir -pv "${BUILD}" ; chown nobody.nobody "${BUILD}"
-mkdir -pv "${REPO}"  ; chown nobody.nobody "${REPO}"
-
-message "nobody: give sudoers permission for pacman"
-cat >/etc/sudoers.d/nobody-pacman-$$ <<EOF
-nobody ALL=(ALL) NOPASSWD: /usr/bin/pacman
+message "${BUILD_USER}: give sudoers permission for pacman"
+cat >/etc/sudoers.d/build-aur-$$ <<EOF
+${BUILD_USER} ALL=(ALL) NOPASSWD: /usr/bin/pacman
 EOF
-trap "rm -v /etc/sudoers.d/nobody-pacman-$$" EXIT
+trap "rm -v /etc/sudoers.d/build-aur-$$" EXIT
+
+if [ ! -d "${BUILD}" ]; then
+    message "${BUILD}: creating"
+    mkdir -pv "${BUILD}"
+    chown "${BUILD_USER}" "${BUILD}"
+    chmod 755 "${BUILD}"
+fi
+
+if [ ! -d "${REPO}" ]; then
+    message "${REPO}: creating"
+    mkdir -pv "${REPO}"
+    chown "${BUILD_USER}" "${REPO}"
+    chmod 755 "${REPO}"
+fi
 
 if [ ! -f "${REPO}/${NAME}.db.tar.gz" ]; then
     message "${REPO}: initializing"
-    tar cvfT "${REPO}/${NAME}.db.tar.gz" /dev/null
-    ln -s "${NAME}.db.tar.gz" "${REPO}/${NAME}.db"
+    : tar cvfT "${REPO}/${NAME}.db.tar.gz" /dev/null
+    : ln -s "${NAME}.db.tar.gz" "${REPO}/${NAME}.db"
     pacman --sync --refresh
     pacman --sync --clean --noconfirm
 fi
@@ -32,15 +46,16 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     [ "${name}" = "python2-pysqlite" ] \
         && url="https://aur.archlinux.org/python-pysqlite.git" \
         || url="https://aur.archlinux.org/${name}.git"
+    # XXX: wtf is this shit?!
 
     if [ ! -d "${name}" ]; then
         message "${name}: cloning ${url}"
-        sudo -u ${BUILD_USER} git clone --origin aur ${url} ${name}
+        : git clone --origin aur ${url} ${name}
     fi
     cd "${name}"
 
     message "${name}: pulling from ${url}"
-    sudo -u ${BUILD_USER} git pull --rebase --verbose
+    : git pull --rebase --verbose
 
     pkgver=$(sed -n '/^pkgver=/ s/pkgver=// p' "PKGBUILD")
     pkgrel=$(sed -n '/^pkgrel=/ s/pkgrel=// p' "PKGBUILD")
@@ -52,13 +67,13 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
         message "${name}-${pkgver}-${pkgrel}: skipping"
     else
         message "${name}-${pkgver}-${pkgrel}: building"
-        sudo -u ${BUILD_USER} makepkg --force --syncdeps --rmdeps --noconfirm --ignorearch
-        mv ${name}-${pkgver}-${pkgrel}*.pkg.tar.xz "${REPO}"
-        repo-add --new "${REPO}/${NAME}.db.tar.gz" ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
+        : makepkg --force --syncdeps --rmdeps --noconfirm --ignorearch
+        : mv ${name}-${pkgver}-${pkgrel}*.pkg.tar.xz "${REPO}"
+        : repo-add --new "${REPO}/${NAME}.db.tar.gz" ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
         pacman --sync --refresh
     fi
 
-    sudo -u ${BUILD_USER} git clean -dxf
+    : git clean -dxf
     cd ..
 done
 
