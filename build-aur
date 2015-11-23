@@ -1,15 +1,16 @@
 #!/bin/bash -e
 
-. /etc/build-aur.conf
-
 message() { echo -e "\e[1;32m==>\e[1;33m $1\e[0;0m" ; }
+
+. ${BUILD_AUR_CONF:-/etc/build-aur.conf}
+
+BUILD_USER=${BUILD_USER:-nobody}
 
 ARCH=$(uname -m)
 NAME=$(basename $REPO)
 
-BUILD_USER=jjm
-
-mkdir -pv "${REPO}"
+mkdir -pv "${BUILD}" ; chown nobody.nobody "${BUILD}"
+mkdir -pv "${REPO}"  ; chown nobody.nobody "${REPO}"
 
 message "nobody: give sudoers permission for pacman"
 cat >/etc/sudoers.d/nobody-pacman-$$ <<EOF
