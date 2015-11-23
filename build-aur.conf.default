@@ -1,2 +1,3 @@
-PKGS=(pkg1 pkg2)
-REPO=/path/to/repo
+PKGS=(pkg1 pkg2 pkg3)
+BUILD=/var/cache/aur_x86_64
+REPO=/var/lib/aur_x86_64
