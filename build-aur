@@ -64,9 +64,11 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     : git fetch aur
     ahead=$(git-ahead)
     behind=$(git-behind)
-    [ $behind -eq 0 ] \
-        && message_green "[-${behind}/+${ahead}] ${name}" \
-        || message_red   "[-${behind}/+${ahead}] ${name}"
+    diverged="[-${behind}/+${ahead}] ${name}" 
+    if   [ $behind -eq 0 -a $ahead -eq 0 ]; then message_green "$diverged"
+    elif [ $behind -eq 0 -a $ahead -gt 0 ]; then message_yellow "$diverged"
+    elif [ $behind -gt 0 -a $ahead -ge 0 ]; then message_red "$diverged"
+    fi
 
     if [ $behind -gt 0 ]; then
         unclean+=("$name")
