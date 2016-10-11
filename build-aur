@@ -9,8 +9,8 @@ function pkgbase {
     curl -s "https://aur.archlinux.org/rpc.php?type=info&arg=$1" \
         | jq -r '.results.PackageBase'
 }
-function git-ahead { git rev-list aur/master..master --count ; }
-function git-behind { git rev-list master..aur/master --count ; }
+function git-ahead { git rev-list @{upstream}..HEAD --count ; }
+function git-behind { git rev-list HEAD..@{upstream} --count ; }
 function : { sudo -u ${BUILD_USER} $* ; }
 
 . ${BUILD_AUR_CONF:-/etc/build-aur.conf}
