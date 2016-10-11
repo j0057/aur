@@ -20,16 +20,19 @@ BUILD_USER=${BUILD_USER:-aur}
 ARCH=$(uname -m)
 NAME=$(basename $REPO)
 
+# check permissions
 if [ "$(id -u)" -ne "0" ]; then
     echo "error: this script must run as root" 1>&2
     exit 1
 fi
 
+# allow build user to run pacman, for the duration of the script
 cat >/etc/sudoers.d/build-aur-$$ <<EOF
 ${BUILD_USER} ALL=(ALL) NOPASSWD: /usr/bin/pacman
 EOF
 trap "rm /etc/sudoers.d/build-aur-$$" EXIT
 
+# check for build directory
 if [ ! -d "${BUILD}" ]; then
     message_red "[create] ${BUILD}"
     mkdir -pv "${BUILD}"
@@ -37,6 +40,7 @@ if [ ! -d "${BUILD}" ]; then
     chmod 755 "${BUILD}"
 fi
 
+# check for repo directory
 if [ ! -d "${REPO}" ]; then
     message_red "[create] ${REPO}"
     mkdir -pv "${REPO}"
@@ -44,6 +48,7 @@ if [ ! -d "${REPO}" ]; then
     chmod 755 "${REPO}"
 fi
 
+# check for repo database file
 if [ ! -f "${REPO}/${NAME}.db.tar.gz" ]; then
     message_red "[init] ${REPO}"
     : tar cvfT "${REPO}/${NAME}.db.tar.gz" /dev/null
@@ -52,48 +57,74 @@ if [ ! -f "${REPO}/${NAME}.db.tar.gz" ]; then
     pacman --sync --clean --noconfirm
 fi
 
+# get up to date pkgbuilds
 cd ${BUILD}
-unclean=()
 for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     name="${PKGS[i]}"
-    url="http://aur.archlinux.org/$(pkgbase $name).git"
 
+    # clone first time
     if [ ! -d "${name}" ]; then
+        url="http://aur.archlinux.org/$(pkgbase $name).git"
         message_yellow "[clone] ${name} from ${url}"
         : git clone --origin aur ${url} ${name}
+
+        # review new repository
+        cd "${name}"
+        : git reset --hard $(git rev-list --reverse aur/master | head -1)
+        : git merge --squash --no-commit aur/master
+        : git commit --amend --no-edit
+        : git log --oneline --stat --patch
+        read -p "==> Code ok? [Y]es/[N]o " answer
+        case "$answer" in
+            y|Y) : git reset --hard aur/master ;;
+            n|N) exit 0 ;;
+            *)   exit 1 ;;
+        esac
+        cd ..
     fi
+
+    # fetch new pkgbuild
     cd "${name}"
-
     : git fetch aur
-    ahead=$(git-ahead)
-    behind=$(git-behind)
-    diverged="[-${behind}/+${ahead}] ${name}" 
-    if   [ $behind -eq 0 -a $ahead -eq 0 ]; then message_green "$diverged"
-    elif [ $behind -eq 0 -a $ahead -gt 0 ]; then message_yellow "$diverged"
-    elif [ $behind -gt 0 -a $ahead -ge 0 ]; then message_red "$diverged"
+
+    # review for pull-rebase
+    if [ "$(git-behind)" -gt 0 ]; then
+        # show new commits in remote
+        git diff --color=always HEAD @{upstream}
+
+        # prompt for permission
+        message_red "[-$(git-behind)/+$(git-ahead)] ${name}"
+        read -p "==> Pull-rebase? [Y]es/[N]o/[Q]uit " answer
+        case "$answer" in
+            y|Y) git pull --rebase ;;
+            n|N) ;;
+            q|Q) exit 0 ;;
+            *)   exit 1 ;;
+        esac
     fi
 
-    if [ $behind -gt 0 ]; then
-        unclean+=("$name")
+    # display status
+    if [ "$(git-behind)" -eq 0 ]; then
+        if [ "$(git-ahead)" -eq 0 ]; then
+            message_green "[-$(git-behind)/+$(git-ahead)] ${name}"
+        else
+            message_yellow "[-$(git-behind)/+$(git-ahead)] ${name}"
+        fi
+    else
+        message_red "[-$(git-behind)/+$(git-ahead)] ${name}"
     fi
+
     cd ..
 done
 
-if [ ${#unclean[*]} -gt 0 ]; then
-    message_red "[error] outdated repos: ${unclean[*]}"
-    exit 2
-fi
-
+# build packages
 for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     name="${PKGS[i]}"
 
     cd "${name}"
 
-    pkgver=$(sed -n '/^pkgver=/ s/pkgver=// p' "PKGBUILD")
-    pkgrel=$(sed -n '/^pkgrel=/ s/pkgrel=// p' "PKGBUILD")
-
-    [ -n "${pkgver}" ]
-    [ -n "${pkgrel}" ]
+    pkgver=$(sed -n "/^pkgver=/ { s/pkgver=['\"]\\?\([^'\"]*\).\\?/\\1/ ; p }" "PKGBUILD") ; [ -n "${pkgver}" ]
+    pkgrel=$(sed -n "/^pkgrel=/ { s/pkgrel=['\"]\\?\([^'\"]*\).\\?/\\1/ ; p }" "PKGBUILD") ; [ -n "${pkgrel}" ]
 
     if [ -f ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz ]; then
         message_green "[skip] ${name}-${pkgver}-${pkgrel}"
@@ -109,4 +140,5 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     cd ..
 done
 
+# list contents of repo
 pacman --sync --list --color=always ${NAME}
