@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -o errexit -o nounset -o pipefail
 
 function message_green  { echo -e "\e[1;36m==>\e[1;32m $1\e[0;0m" ; }
 function message_red    { echo -e "\e[1;36m==>\e[1;31m $1\e[0;0m" ; }
