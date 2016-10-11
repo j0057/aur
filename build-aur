@@ -20,6 +20,11 @@ BUILD_USER=${BUILD_USER:-aur}
 ARCH=$(uname -m)
 NAME=$(basename $REPO)
 
+if [ "$(id -u)" -ne "0" ]; then
+    echo "error: this script must run as root" 1>&2
+    exit 1
+fi
+
 cat >/etc/sudoers.d/build-aur-$$ <<EOF
 ${BUILD_USER} ALL=(ALL) NOPASSWD: /usr/bin/pacman
 EOF
