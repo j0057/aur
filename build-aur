@@ -22,7 +22,7 @@ NAME=$(basename $REPO)
 
 # check permissions
 if [ "$(id -u)" -ne "0" ]; then
-    echo "error: this script must run as root" 1>&2
+    message_red "error: this script must run as root" 1>&2
     exit 1
 fi
 
