@@ -67,7 +67,7 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
 
     # clone first time
     if [ ! -d "${name}" ]; then
-        url="http://aur.archlinux.org/$(pkgbase $name).git"
+        url="https://aur.archlinux.org/$(pkgbase $name).git/"
         message_yellow "[clone] ${name} from ${url}"
         : git clone --origin aur ${url} ${name}
 
