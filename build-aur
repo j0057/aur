@@ -73,10 +73,15 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
 
         # review new repository
         cd "${name}"
-        : git reset --hard $(git rev-list --reverse aur/master | head -1)
-        : git merge --squash --no-commit aur/master
-        : git commit --amend --no-edit
-        : git log --oneline --stat --patch
+        git ls-tree -rtz --name-only --full-name aur/master \
+            | xargs -0i bash -c '
+                echo -e "\e[1;35m#";
+                echo -e "\e[1;35m# {}";
+                echo -e "\e[1;35m#";
+                echo;
+                cat {};
+                echo' \
+            | less -R
         read -p "==> Code ok? [Y]es/[N]o " answer
         case "$answer" in
             y|Y) : git reset --hard aur/master ;;
