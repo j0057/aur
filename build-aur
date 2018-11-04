@@ -139,8 +139,8 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
     else
         message_yellow "[build] ${name}-${pkgver}-${pkgrel}"
         : makepkg --force --syncdeps --rmdeps --noconfirm --ignorearch --clean --cleanbuild
-        : mv ${name}-${pkgver}-${pkgrel}*.pkg.tar.xz "${REPO}"
-        : repo-add --new "${REPO}/${NAME}.db.tar.gz" ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz
+        : mv ${name}*-${pkgver}-${pkgrel}*.pkg.tar.xz "${REPO}"
+        : repo-add --new "${REPO}/${NAME}.db.tar.gz" ${REPO}/${name}*-${pkgver}-${pkgrel}-*.pkg.tar.xz
         pacman --sync --refresh
     fi
 
