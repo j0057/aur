@@ -131,8 +131,8 @@ for (( i=0 ; i < ${#PKGS[*]} ; i++ )); do
 
     cd "${name}"
 
-    pkgver=$(sed -n "/^pkgver=/ { s/pkgver=['\"]\\?\([^'\"]*\).\\?/\\1/ ; p }" "PKGBUILD") ; [ -n "${pkgver}" ]
-    pkgrel=$(sed -n "/^pkgrel=/ { s/pkgrel=['\"]\\?\([^'\"]*\).\\?/\\1/ ; p }" "PKGBUILD") ; [ -n "${pkgrel}" ]
+    pkgver=$(sudo -u $BUILD_USER makepkg --printsrcinfo | awk '$1=="pkgver" { print $3 }')
+    pkgrel=$(sudo -u $BUILD_USER makepkg --printsrcinfo | awk '$1=="pkgrel" { print $3 }')
 
     if [ -f ${REPO}/${name}-${pkgver}-${pkgrel}-*.pkg.tar.xz ]; then
         message_green "[skip] ${name}-${pkgver}-${pkgrel}"
